@@ -1,0 +1,25 @@
+version: 0.2
+
+phases:
+  install:
+    runtime-versions:
+      nodejs: 20
+    commands:
+      - echo "Installing dependencies"
+      - npm install
+
+  build:
+    commands:
+      - echo "Building the React application"
+      - npm run build
+      - echo "Syncing files to S3"
+      - aws s3 sync build/ $S3_BUCKET_URL --delete
+
+  post_build:
+    commands:
+      - echo "Invalidating CloudFront cache"
+      - aws cloudfront create-invalidation --distribution-id $CLOUDFRONT_DISTRIBUTION_ID --paths "/*"
+
+artifacts:
+  files:
+    - '**/*'
