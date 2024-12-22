@@ -13,7 +13,7 @@ phases:
       - echo "Building the React application"
       - npm run build
       - echo "Syncing files to S3"
-      - aws s3 sync build/ $S3_BUCKET_URL --delete
+      - aws s3 sync build/ $S3_BUCKET_URL --delete --exclude "courses.json"
 
   post_build:
     commands:
@@ -22,4 +22,7 @@ phases:
 
 artifacts:
   files:
-    - '**/*'
+    - "build/**"
+    - "build/*.html"
+    - "build/static/**/*"
+  discard-paths: no
