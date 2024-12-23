@@ -125,17 +125,14 @@ const handleFetchCourses = async (queryStringParameters) => {
     await client.connect();
     const db = client.db("sugang");
 
-    // 검색 조건 생성
+    // 검색 조건
     const searchFilter = searchQuery
       ? {
-          $or: [
-            { 과목명: { $regex: searchQuery, $options: 'i' } },
-            { 담당교수: { $regex: searchQuery, $options: 'i' } },
-            { 학과: { $regex: searchQuery, $options: 'i' } },
-          ],
+          $text: { $search: searchQuery },
         }
       : {};
 
+    // 쿼리 실행
     const courses = await db.collection("courses")
       .find(searchFilter)
       .skip(skip)
@@ -276,7 +273,7 @@ const handleUnregisterCourse = async (event) => {
     tlsInsecure: false, // 서버 인증서를 검증 (권장)
     retryWrites: false, // DocumentDB에선 retryWrites가 비활성화되어야 함
   });
-  
+
   const { studentId, courseId } = JSON.parse(event.body);
 
   try {
