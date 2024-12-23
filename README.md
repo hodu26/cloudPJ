@@ -40,6 +40,26 @@
 ![Architecture Diagram](https://github.com/user-attachments/assets/74ff68d3-7c99-4688-91da-4bca97fdf6d0)
 ( CloudFront -> lambda-db.js (로그인, 강의 불러오기) -> SQS -> lambda-sqs.js (수강신청 처리) )
 
+### 🗂️ 프로젝트 구조
+
+```plaintext
+📦 프로젝트 루트
+├── 📂 src
+│   ├── 📂 components       # React 컴포넌트
+│   ├── 📂 pages            # 페이지 구성
+│   ├── 📂 utils            # 유틸리티 함수
+│   ├── 📂 api              # API 호출 모듈
+├── 📂 public               # 정적 파일
+├── 📜 buildspec.yaml       # Code Pipeline 배포 파일
+├── 📜 README.md            # 프로젝트 설명서
+|
+├── 📂 lambda
+|   ├── 📂 server.js                  # local-test용
+│   ├── 📂 index-db.js                # lambda - 백엔드 1
+│   ├── 📂 index-sqs.js               # lambda - 백엔드 
+│   ├── 📂 add_json_to_documents      # documentDB에 json 삽입하는 lambda
+│   ├── 📂 convert_to_json.py         # excel to json 변환
+```
 
 ## 📱 주요 화면
 
