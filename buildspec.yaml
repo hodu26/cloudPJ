@@ -10,10 +10,17 @@ phases:
 
   build:
     commands:
+      - echo "Creating .env file for environment variables"
+      - echo "REACT_APP_API_BASE_URL=$REACT_APP_API_BASE_URL" >> .env
+
       - echo "Building the React application"
       - npm run build
+
       - echo "Syncing files to S3"
       - aws s3 sync build/ $S3_BUCKET_URL --delete --exclude "courses.json"
+
+      - echo "Removing .env file after build"
+      - rm .env
 
   post_build:
     commands:
