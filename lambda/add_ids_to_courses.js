@@ -6,13 +6,14 @@ require("dotenv").config();
 // S3 설정
 const S3_BUCKET_NAME = process.env.S3_BUCKET_NAME || "my-local-bucket";
 const S3_COURSE_KEY = process.env.S3_COURSE_KEY || "courses.json";
-const s3 = new AWS.S3({
-  accessKeyId: process.env.AWS_ACCESS_KEY_ID || "test", // LocalStack에서는 더미 값 사용
-  secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || "test",
-  region: process.env.AWS_DEFAULT_REGION || "us-east-1",
-  endpoint: process.env.LOCALSTACK_URI || "http://localhost:8080", // LocalStack의 엔드포인트
-  s3ForcePathStyle: true, // Path-style 접근 필요
-});
+const s3 = new AWS.S3();
+// const s3 = new AWS.S3({
+//   accessKeyId: process.env.AWS_ACCESS_KEY_ID || "test", // LocalStack에서는 더미 값 사용
+//   secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || "test",
+//   region: process.env.AWS_DEFAULT_REGION || "us-east-1",
+//   endpoint: process.env.LOCALSTACK_URI || "http://localhost:8080", // LocalStack의 엔드포인트
+//   s3ForcePathStyle: true, // Path-style 접근 필요
+// });
 
 // JSON 데이터에 MongoDB ObjectId 추가
 const addObjectIdToCourses = (courses) => {

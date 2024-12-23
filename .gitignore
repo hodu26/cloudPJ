@@ -33,5 +33,6 @@ yarn-error.log*
 # lambda
 /lambda/node_modules
 /lambda/.env
-/lambda/courses.*
+/lambda/courses*.*
 /lambda/*.zip
+/lambda/*.pem

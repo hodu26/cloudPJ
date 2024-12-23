@@ -47,7 +47,7 @@ const Sugang = () => {
         navigate('/signin');
       }
     }
-  }, [token, navigate]);
+  }, [token, navigate, searchQuery]);
 
   // API에서 받아온 데이터 처리
   const initializeData = async (studentId) => {

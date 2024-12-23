@@ -1,14 +1,9 @@
-const { MongoClient } = require("mongodb");
+const { MongoClient, ObjectId } = require("mongodb");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
-const AWS = require("aws-sdk");
 
-const JWT_SECRET = process.env.JWT_SECRET || "secret_key";
+const JWT_SECRET = process.env.JWT_SECRET || 'secret_key';
 const DOCUMENTDB_URI = process.env.DOCUMENTDB_URI;
-const S3_BUCKET_NAME = process.env.S3_BUCKET_NAME;
-const S3_COURSE_KEY = process.env.S3_COURSE_KEY;
-
-const s3 = new AWS.S3();
 
 const certificatePath = `${__dirname}/global-bundle.pem`;
 
@@ -53,9 +48,7 @@ const handleSignup = async (event) => {
       return { statusCode: 400, body: JSON.stringify({ message: "Missing required fields" }) };
     }
 
-    console.log("Connected to DocumentDB test");
     await client.connect();
-    console.log("Connected to DocumentDB successfully");
     const db = client.db("sugang");
     const existingUser = await db.collection("users").findOne({ studentId });
 
@@ -64,14 +57,14 @@ const handleSignup = async (event) => {
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
-    await db.collection("users").insertOne({
-      name,
-      studentId,
-      password: hashedPassword,
-      department,
-      registeredCourses: [],
-      createdAt: new Date(),
-    });
+    await db.collection("users").insertOne({ 
+        name, 
+        studentId, 
+        password: hashedPassword, 
+        department, 
+        registeredCourses: [], 
+        createdAt: new Date() 
+      });
 
     return { statusCode: 201, body: JSON.stringify({ message: "Signup successful" }) };
   } finally {
@@ -113,32 +106,49 @@ const handleLogin = async (event) => {
   }
 };
 
-// Fetch Courses from S3
+// Fetch Courses
 const handleFetchCourses = async (queryStringParameters) => {
+  // MongoDB 클라이언트 설정
+  const client = new MongoClient(DOCUMENTDB_URI, {
+    tls: true,
+    tlsCAFile: certificatePath, // 인증서 파일 설정
+    tlsInsecure: false, // 서버 인증서를 검증 (권장)
+    retryWrites: false, // DocumentDB에선 retryWrites가 비활성화되어야 함
+  });
+
   const page = parseInt(queryStringParameters?.page) || 1;
   const limit = parseInt(queryStringParameters?.limit) || 20;
   const skip = (page - 1) * limit;
-  const searchQuery = queryStringParameters?.search?.trim() || "";
+  const searchQuery = queryStringParameters?.search?.trim() || '컴퓨터';
 
   try {
-    const data = await s3
-      .getObject({ Bucket: S3_BUCKET_NAME, Key: S3_COURSE_KEY })
-      .promise();
+    await client.connect();
+    const db = client.db("sugang");
 
-    const courses = JSON.parse(data.Body.toString());
-    const filteredCourses = courses.filter((course) =>
-      course.과목명.includes(searchQuery) ||
-      course.담당교수.includes(searchQuery) ||
-      course.학과.includes(searchQuery)
-    );
+    // 검색 조건 생성
+    const searchFilter = searchQuery
+      ? {
+          $or: [
+            { 과목명: { $regex: searchQuery, $options: 'i' } },
+            { 담당교수: { $regex: searchQuery, $options: 'i' } },
+            { 학과: { $regex: searchQuery, $options: 'i' } },
+          ],
+        }
+      : {};
 
-    const paginatedCourses = filteredCourses.slice(skip, skip + limit);
+    const courses = await db.collection("courses")
+      .find(searchFilter)
+      .skip(skip)
+      .limit(limit)
+      .toArray();
+
+    const totalCourses = await db.collection("courses").countDocuments(searchFilter);
 
     return {
       statusCode: 200,
       body: JSON.stringify({
-        courses: paginatedCourses.map((course) => ({
-          id: course._id,
+        courses: courses.map(course => ({
+          id: course._id.toString(),
           name: course.과목명,
           professor: course.담당교수,
           credits: course.학점,
@@ -146,53 +156,66 @@ const handleFetchCourses = async (queryStringParameters) => {
           capacity: course.수강정원,
           schedule: course.스케줄,
         })),
-        totalCourses: filteredCourses.length,
+        totalCourses,
       }),
     };
-  } catch (err) {
-    return { statusCode: 500, body: JSON.stringify({ error: err.message }) };
+  } finally {
+    await client.close();
   }
 };
 
-// Fetch Registered Courses from S3
+// Fetch Registered Courses
 const handleFetchRegisteredCourses = async (queryStringParameters) => {
-  const studentId = queryStringParameters?.studentId;
+  // MongoDB 클라이언트 설정
+  const client = new MongoClient(DOCUMENTDB_URI, {
+    tls: true,
+    tlsCAFile: certificatePath, // 인증서 파일 설정
+    tlsInsecure: false, // 서버 인증서를 검증 (권장)
+    retryWrites: false, // DocumentDB에선 retryWrites가 비활성화되어야 함
+  });
 
-  if (!studentId) {
-    return {
-      statusCode: 400,
-      body: JSON.stringify({ message: "Missing studentId" }),
-    };
-  }
+  const studentId = queryStringParameters?.studentId || '202012233'
 
   try {
-    const data = await s3
-      .getObject({ Bucket: S3_BUCKET_NAME, Key: S3_COURSE_KEY })
-      .promise();
+    if (!studentId) {
+      return {
+        statusCode: 400,
+        body: JSON.stringify({ message: "Missing studentId" }),
+      };
+    }
 
-    const courses = JSON.parse(data.Body.toString());
-    const registeredCourses = courses.filter((course) =>
-      course.registeredStudents?.includes(studentId)
-    );
+    await client.connect();
+    const db = client.db("sugang");
+    const user = await db.collection("users").findOne({ studentId });
+
+    if (!user) {
+      return {
+        statusCode: 404,
+        body: JSON.stringify({ message: "User not found" }),
+      };
+    }
+
+    const registeredCourses = await db.collection("courses")
+      .find({ _id: { $in: user.registeredCourses.map(id => new ObjectId(id)) } })
+      .toArray();
 
     return {
       statusCode: 200,
-      body: JSON.stringify(
-        registeredCourses.map((course) => ({
-          id: course._id,
-          name: course.과목명,
-          professor: course.담당교수,
-          credits: course.학점,
-          registered: course.수강인원,
-          capacity: course.수강정원,
-          schedule: course.스케줄,
-        }))
-      ),
+      body: JSON.stringify(registeredCourses.map(course => ({
+        id: course._id.toString(),
+        name: course.과목명,
+        professor: course.담당교수,
+        credits: course.학점,
+        registered: course.수강인원,
+        capacity: course.수강정원,
+        schedule: course.스케줄,
+      })))
     };
-  } catch (err) {
-    return { statusCode: 500, body: JSON.stringify({ error: err.message }) };
+  } finally {
+    await client.close();
   }
 };
+  
 
 // Register for a Course
 const handleRegisterCourse = async (event) => {
@@ -209,8 +232,17 @@ const handleRegisterCourse = async (event) => {
   try {
     await client.connect();
     const db = client.db("sugang");
-    const user = await db.collection("users").findOne({ studentId });
+    const course = await db.collection("courses").findOne({ _id: new ObjectId(courseId) });
 
+    if (!course) {
+      return { statusCode: 404, body: JSON.stringify({ message: "Course not found" }) };
+    }
+
+    if (course.수강인원 >= course.수강정원) {
+      return { statusCode: 400, body: JSON.stringify({ message: "Course is full" }) };
+    }
+
+    const user = await db.collection("users").findOne({ studentId });
     if (!user) {
       return { statusCode: 404, body: JSON.stringify({ message: "User not found" }) };
     }
@@ -222,6 +254,11 @@ const handleRegisterCourse = async (event) => {
     await db.collection("users").updateOne(
       { studentId },
       { $push: { registeredCourses: courseId } }
+    );
+
+    await db.collection("courses").updateOne(
+      { _id: new ObjectId(courseId) },
+      { $inc: { 수강인원: 1 } }
     );
 
     return { statusCode: 200, body: JSON.stringify({ message: "Course registered successfully" }) };
@@ -239,7 +276,7 @@ const handleUnregisterCourse = async (event) => {
     tlsInsecure: false, // 서버 인증서를 검증 (권장)
     retryWrites: false, // DocumentDB에선 retryWrites가 비활성화되어야 함
   });
-
+  
   const { studentId, courseId } = JSON.parse(event.body);
 
   try {
@@ -248,6 +285,11 @@ const handleUnregisterCourse = async (event) => {
     await db.collection("users").updateOne(
       { studentId },
       { $pull: { registeredCourses: courseId } }
+    );
+
+    await db.collection("courses").updateOne(
+      { _id: new ObjectId(courseId) },
+      { $inc: { 수강인원: -1 } }
     );
 
     return { statusCode: 200, body: JSON.stringify({ message: "Course unregistered successfully" }) };
