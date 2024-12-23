@@ -23,6 +23,9 @@ const Header = ({ user, onLogout }) => {
                 <a href="#" className="text-gray-500 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium">
                   시간표 조회
                 </a>
+                <a href="#" className="text-gray-500 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium">
+                  지역: 버지니아
+                </a>
               </div>
             </div>
           </div>
